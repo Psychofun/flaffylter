@@ -9,10 +9,12 @@ import math
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
-
+from scipy.spatial import ConvexHull
 
 filters = ['images/sunglasses.png', 'images/sunglasses_2.png', 'images/sunglasses_3.jpg', 'images/sunglasses_4.png', 'images/sunglasses_5.jpg', 'images/sunglasses_6.png','images/pixel.png']
 filterIndex = 6
+
+
 
 def open_image(image_path):
     
@@ -40,8 +42,122 @@ def open_image_cv2(image_path):
 
     return img
 
+def draw_sprite( frame, sprite, x_offset, y_offset):
+    """
+    frame: array or image
+    
+    sprite: array or image
+
+    x_offset: integer
+        number of colums where put sprite.
+    
+    y_offset: integer
+        number of rows where put sprite.
+
+    """
+    h,w = sprite.shape[0], sprite.shape[1]
+
+    imgH, imgW = frame.shape[0], frame.shape[1]
+
+    if y_offset +  h  >= imgH:  #if sprite gets out of image in the bottom
+        sprite = sprite[0: imgH - y_offset, :, :]
+
+    if x_offset + w >= imgW: 
+        #if sprite gets out of image in the bottom
+        sprite =sprite[:,0: imgW - x_offset , :]
+    if x_offset < 0 : #if sprite gets out of image to the left
+        sprite = sprite[ :, abs(x_offset)::,: ]
+        w = sprite.shape[0]
+        x_offset = 0 
+    # For each RGB channel
+    for c in range(3):
+        # Chanel 4 is for alpha: 255 100% opaque, 0 is transparent.
+        alpha = sprite[: , :, 3 ] / 255 # Alpha values are in [0,1]
+        frame[y_offset: y_offset + h, x_offset: x_offset + w, c ] = sprite[:,:,c]  * alpha  +  frame[y_offset: y_offset + h , x_offset: x_offset + w, c ] * (1 - alpha)
+
+    return frame 
+
+
+def get_best_scaling(target_width, filter_width ):
+    """
+    target_width: integer
+        width for feature in face. For example width of  bounding box for eyes.
+    filter_width: integer
+        width of filter    
+    """
+    # Scale width by 1.1
+
+    return 1.1 * (target_width / filter_width)
+
+
+
+def get_eye_angle(left_eye,right_eye):
+    """
+    left_eye: 2D tuple, array or list 
+
+    right_eye: 2D  tuple, array or list
+    """
+
+    #find vector 
+    vec  = [right_eye[0] - left_eye[0]  , right_eye[1] - left_eye[1] ]
+
+    angle = vec[0] /  np.sqrt( vec[0]**2  + vec[1] ** 2  )
+
+    return angle 
+
+
+
+def rotate_image(img, angle, scale):
+    """
+    img: numpy array or image like object
+    angle: int 
+        Angle in degrees
+    scale: float 
+        scale on range [0,1]
+    """
+    height, width  = (img.shape[0], img.shape[1])
+    shape = (width,height)
+    center = width / 2, height/2
+
+    rotation_matrix = cv2.getRotationMatrix2D(center,
+                                              angle,
+                                              scale = 1.0)
+
+    new_img = cv2.warpAffine(img, rotation_matrix, shape,
+                             flags = cv2.INTER_LINEAR,
+                             borderMode = cv2.BORDER_TRANSPARENT)
+    return new_img
+
 
     
+
+
+
+def get_points_from_feature(name,preds):
+    """
+    name: string
+        name of feature. Example eye1, eye2.
+
+    preds: list
+        list of list [ [x1,y1], [x2,y2], ...  ]
+    return a list of pairs (x,y) 
+    """
+
+    points = preds[PRED_TYPES[name].slice]
+
+    return points
+
+
+def get_centroid(hull):
+    """
+    hull: ConvexHull
+    """
+    cx = np.mean(hull.points[hull.vertices,0])
+    cy = np.mean(hull.points[hull.vertices,1])
+
+    return cx,cy
+
+
 # Main Function to apply dog filter
 def add_filter(img_path, dog_filter):
     
@@ -58,11 +174,11 @@ def add_filter(img_path, dog_filter):
         return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     
     for x,y,w,h,_ in faces:   
-        print("x y wh",x,y,w,h)  
+        #print("x y w h",x,y,w,h)  
         
         x,y,w,h = tuple(map(int, [x,y,w,h] ))
         # add bounding box to color image
-        #cv2.rectangle(img,(x,y),(x+w,y+h),(255,0,0),2)
+        #cv2.rectangle(img,(x,y),(w,h),(255,0,0),2)
 
         gray_face = gray[y: y + h,x: x + w]
         color_face = img[y: y + h,x: x + w]
@@ -70,41 +186,41 @@ def add_filter(img_path, dog_filter):
 
         eye1, eye2 = (preds[PRED_TYPES['eye1'].slice,0],preds[PRED_TYPES['eye1'].slice,1]),(preds[PRED_TYPES['eye2'].slice,0],preds[PRED_TYPES['eye1'].slice,1])
 
-       
-
-        
         sunglasses = cv2.imread(filters[filterIndex], cv2.IMREAD_UNCHANGED)
 
         y_coordinates = eye1[1] + eye2[1]
-
         max_y,min_y = np.max(y_coordinates), np.min(y_coordinates) 
-        sunglass_width = int(  max_y  -  min_y  ) *2
-
+        eyes_heigth= int(  max_y  -  min_y  )
 
         x_coordinates =  eye1[0] + eye2[0]
         max_x,min_x =np.max(x_coordinates) , np.min(x_coordinates)
+        eyes_width = int( max_x - min_x   ) 
+        #print("Eye 1 {}, Eye 2 {}".format(eye1,eye2))
 
 
-        sunglass_heigth = int( max_x - min_x   ) *2
-        print("Eye 1 {}, Eye 2 {}".format(eye1,eye2))
+        #print("Sunglasses width {} and height {} ".format(eyes_width, eyes_heigth )) 
 
+        sunglasses_resized = cv2.resize(sunglasses, (eyes_width * 2,eyes_heigth * 2),interpolation = cv2.INTER_CUBIC)
+        
+        #print("Points from feature", get_points_from_feature('eye1',preds))
+        left_hull = ConvexHull( get_points_from_feature('eye1',preds))
+        right_hull = ConvexHull(get_points_from_feature('eye2',preds))
 
-        print("Sunglasse width {} and height {} ".format(sunglass_width, sunglass_heigth )) 
+        left_eye_centrum  = get_centroid(left_hull)
+        right_eye_centrum = get_centroid(right_hull)
+        eyes_angle = get_eye_angle(left_eye_centrum, right_eye_centrum)
 
-        sunglass_resized = cv2.resize(sunglasses, (sunglass_heigth,sunglass_width),interpolation = cv2.INTER_CUBIC)
-        transparent_region = sunglass_resized[:,:,:3] != 0 
+        #print("Eyes angle", eyes_angle)
+        # Rotate  sunglasses by angle between eyes
+        sunglasses_final = rotate_image(sunglasses_resized,-eyes_angle, 1 )
+        
+        # Get anchor for sunglasses
+        anchor_x, anchor_y = int(np.min(eye1[0])),int(np.min(eye1[1]))
+     
         
         #Overlay sunglasses over img
-        #face_resized_color[int(points[9][1]):int(points[9][1])+sunglass_height, int(points[9][0]):int(points[9][0])+sunglass_width,:][transparent_region] = sunglass_resized[:,:,:3][transparent_region]
-        x_,y_ = int(np.min(eye1[0])),int(np.min(eye1[1]))
-        img[  y_ : y_ +sunglass_width,x_: x_ + sunglass_heigth:] = sunglass_resized[:,:,:3]
+        img = draw_sprite(frame = img , sprite = sunglasses_final, x_offset= anchor_x, y_offset = anchor_y  )
         
-        #transparent_region_2 = sunglasses[:,:,:3] != 0 
-
-        #alpha = sunglasses[:, :, 3] / 255.0
-        #new_image = np.dstack((alpha * sunglasses[:,:,0], alpha * sunglasses[:,:,1],alpha * sunglasses[:,:,2]))
-        #img[0:sunglasses.shape[0]  ,0:sunglasses.shape[1] ,:] = new_image
-
 
         #for point in preds:
         #    cv2.circle(img, tuple(point), 1, (255,255,255), 1)
@@ -117,7 +233,7 @@ def add_filter(img_path, dog_filter):
        
     #Change to RGB
     result = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    #and return
+  
     return result
     
   
@@ -210,6 +326,10 @@ def image_2d_landmarks(image_path):
 
 def image_3d_landmarks():
     pass
+
+
+
+
 
 
 if __name__ == "__main__":
