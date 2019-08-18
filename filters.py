@@ -94,7 +94,10 @@ def adjust_sprite2head(sprite, head_width, head_y_pos, ontop = True):
     """
 
     (h_sprite, w_sprite) = (sprite.shape[0],sprite.shape[1])
-    factor = 1.0 *  head_width / w_sprite
+
+    #print("Head width {} width sprite {}".format(head_width, w_sprite))
+    factor = 1.1 *  head_width / w_sprite
+    #print("Factor ", factor)
     
     # Resize sprite. Adjust to have the same width as head
     sprite = cv2.resize(sprite, (0,0),fx = factor, fy = factor )
@@ -102,7 +105,7 @@ def adjust_sprite2head(sprite, head_width, head_y_pos, ontop = True):
     h_sprite, w_sprite = (sprite.shape[0], sprite.shape[1])
 
     # Adjust the position of sprite to end where the head begins
-    y_orig = head_y_pos  - h_sprite if ontop else  head_ypos
+    y_orig = head_y_pos  - h_sprite if ontop else  head_y_pos
 
     # Check if the head is not to close to the top of the image and the sprite would not fit in the screen
     if y_orig < 0:
@@ -131,17 +134,7 @@ def apply_sprite(image, sprite,w,x,y, angle, ontop = True):
 
 
 
-def calculate_inclination(point1, point2):
-    """
-    point1: list or tuple [x,y] or (x,y)
-    point2: list or tuple [x,y] or (x,y)
-    Returns angle between points in degrees
-    """
-    x1,y1,x2,y2 = point1[0], point1[1], point2[0],point2[1]
 
-    incl = 180/math.pi * math.atan( (y2-y1)/(x2-x1))
-
-    return incl
 
 def compute_inclination(point1, point2):
     """
@@ -161,18 +154,22 @@ def compute_inclination(point1, point2):
 
 def calculate_boundbox(list_coordinates):
     """
+    coordinates are inverted  x: colums y :rows
+
+
     list_coordinates: list of the form [ [x2,y1], [x2,y2], . . .    ]
 
     returns top  left point (x,y) and width (w) and heigth (h) of rectangle 
 
     """
-    
+  
     x = int(min(list_coordinates[:,0]))
     y = int(min(list_coordinates[:,1]))
 
     w  =int(max(list_coordinates[:,0]) - x)
-    h = int(max(list_coordinates[:,1]) - x)
+    h = int(max(list_coordinates[:,1]) - y)
 
+  
     return x,y,w,h
 
 
@@ -191,7 +188,7 @@ def get_face_boundbox(points,face_part):
 
     part_points = get_points_from_feature(name = face_part,preds = points)
 
-    print("Part points", part_points)
+   
 
     x,y,w,h = calculate_boundbox( part_points)
 
@@ -200,42 +197,6 @@ def get_face_boundbox(points,face_part):
 
 
 
-    
-
-
-
-
-
-    
-
-
-
-
-
-"""def apply_sprite2feature(image,sprite_path, x_offset, y_offset,y_offset_image, adjust2feature, desired_width, x, y , w, h ):
-    h_sprite, w_sprite =  sprite.shape[0], sprite.shape[1]
-
-    x_pos = x + x_offset 
-    ypos =  y + y_offset 
-
-    factor = 1.0 * desired_width/w_sprite
-
-    sub_img = image[y + y_offset_image: y + h,  x: x + w,:]
-
-    feature = None
-
-    if len(feature) != 0:
-        xpos, ypos = x,y  + feature[0,1] # Adjust only to feature in y axis (eyes)
-
-        if adjust2feature:
-            size_mustache = 1.2 # How many times bigger than mouth 
-            factor= 1.0 * (feature[0,2]*size_mustache)/w_sprite
-            xpos = x + feature[0,0] - int(feature[0,2]*(size_mustache - 1)/2) # Centered respect to width
-            ypos = y + y_offset +  feature[0,1] - int(h_sprite * factor) # Right on top
-
-    sprite = cv2.resize(sprite, (0,0), fx = factor, fy = factor )
-    image = draw_sprite(image,sprite,xpos,ypos)
- """
 def get_best_scaling(target_width, filter_width ):
     """
     target_width: integer
@@ -303,6 +264,22 @@ def get_points_from_feature(name,preds):
     return points
 
 
+def get_eyes_width_heigth(preds):
+    eye1, eye2 = (preds[PRED_TYPES['eye1'].slice,0],preds[PRED_TYPES['eye1'].slice,1]),(preds[PRED_TYPES['eye2'].slice,0],preds[PRED_TYPES['eye1'].slice,1])
+
+    #sunglasses = cv2.imread(filters[filterIndex], cv2.IMREAD_UNCHANGED)
+
+    y_coordinates = eye1[1] + eye2[1]
+    max_y,min_y = np.max(y_coordinates), np.min(y_coordinates) 
+    eyes_heigth= int(  max_y  -  min_y  )
+
+    x_coordinates =  eye1[0] + eye2[0]
+    max_x,min_x =np.max(x_coordinates) , np.min(x_coordinates)
+    eyes_width = int( max_x - min_x   ) 
+
+    return eyes_width, eyes_heigth
+
+
 
 
 # Main Function to apply filters
@@ -320,12 +297,15 @@ def add_filter(img_path, filter_name):
         print("No faces Detected in the image")
         return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     
+
+    # Coordinates are inverted  x: colums y :rows
+
     for x,y,x2,y2,_ in faces:   
        
         
         x,y,x2,y2 = tuple(map(int, [x,y,x2,y2] ))
         # add bounding box to color image
-        cv2.rectangle(img,(x,y),(x2,y2),(255,0,0),2)
+        #cv2.rectangle(img,(x,y),(x2,y2),(255,0,0),2)
 
         gray_face = gray[y:y2, x:x2]
         color_face = img[y:y2, x: x2]
@@ -336,34 +316,21 @@ def add_filter(img_path, filter_name):
 
         eyebrow1, eyebrow2 = get_points_from_feature(name ='eyebrow1' ,preds=preds), get_points_from_feature(name = 'eyebrow2', preds = preds)
         
-        print("Eyebrown1 {} eyebrown2 {} ".format(eyebrow1, eyebrow2))
+      
 
-        angle =  compute_inclination(eyebrow1[0],eyebrow2[0] ) #inclination based on eyebrowns
-        print("Angle: ", angle)
-
-        mouth = get_points_from_feature(name = 'lips', preds = preds)
-        # Condition to see if mouth is open
-        is_mouth_open = abs(max(mouth[:,0]) -  min(mouth[:,0]) ) >=  20
-        print("is mouth open: ", is_mouth_open)
-
-
-
+        angle =-1* compute_inclination(eyebrow1[0],eyebrow2[0] ) #inclination based on eyebrowns
         
 
-        """eye1, eye2 = (preds[PRED_TYPES['eye1'].slice,0],preds[PRED_TYPES['eye1'].slice,1]),(preds[PRED_TYPES['eye2'].slice,0],preds[PRED_TYPES['eye1'].slice,1])
+        mouth = get_points_from_feature(name = 'lips', preds = preds)
 
-        sunglasses = cv2.imread(filters[filterIndex], cv2.IMREAD_UNCHANGED)
+        # Condition to see if mouth is open
+        is_mouth_open = abs(max(mouth[:,0]) -  min(mouth[:,0]) ) >=  20
+       
 
-        y_coordinates = eye1[1] + eye2[1]
-        max_y,min_y = np.max(y_coordinates), np.min(y_coordinates) 
-        eyes_heigth= int(  max_y  -  min_y  )
-
-        x_coordinates =  eye1[0] + eye2[0]
-        max_x,min_x =np.max(x_coordinates) , np.min(x_coordinates)
-        eyes_width = int( max_x - min_x   ) """
 
         # Compute width
-        w =  int( abs(y2 - y))
+        w =  int(  y2 - y    ) 
+        
 
         if filter_name == 'hat':
             # Hat
@@ -376,10 +343,13 @@ def add_filter(img_path, filter_name):
 
             x_1, y_1, w_1, h_1 = get_face_boundbox(points = preds  , face_part = 'lips')
             mustache_image = SPRITES['mustache']
-            apply_sprite(img,mustache_image, w_1,x_1,y_1,angle )
+            apply_sprite(img,mustache_image,w_1,x_1,y_1,angle )
         
         if filter_name == 'glasses':
             x_3, y_3,_ ,h_3 = get_face_boundbox(points = preds, face_part = 'eyebrow1')
+            w_eyes,h_eyes = get_eyes_width_heigth(preds)
+            print("W EYES ",w_eyes,w )
+
             glasses_image = SPRITES['glasses']
             apply_sprite(img, glasses_image,w,x,y_3, angle, ontop= False )
 
@@ -388,11 +358,34 @@ def add_filter(img_path, filter_name):
             #to make the "animation" we read each time a different image of that folder
             # the images are placed in the correct order to give the animation impresion
             
-            apply_sprite(img, FLIES[FLIES.keys()[0]], w , x , y, angle)
+            apply_sprite(img, FLIES[list(FLIES.keys())[0]], w , x , y, angle)
             #i+=1
             #i = 0 if i >= len(flies) else i #when done with all images of that folder, begin again
 
             
+        x0, y0, w0, h0 = get_face_boundbox(preds, face_part = "lips")
+
+        # CV2 Assumes (x,y) : (row , column)
+        #cv2.rectangle(img,(x0,y0),(x0 + w0,y0  + h0),(255,0,0),1)
+
+        if filter_name == "doggy":
+
+            x3 , y3, w3, h3 = get_face_boundbox(preds, 'nostril')
+       
+            
+
+            apply_sprite(img,SPRITES['doggy_nose'],w3, x3, y3, angle, ontop = False )
+
+            apply_sprite(img,SPRITES['doggy_ears'], w, x, y , angle )
+
+
+            if is_mouth_open:
+                apply_sprite(img, SPRITES['doggy_tongue'], w0,x0,y0,angle, ontop = False)
+        
+        if filter_name == 'rainbow':
+            
+            if True:
+                apply_sprite(img, SPRITES['rainbow'], w0,x0,y0,angle, ontop = False)
 
 
 
@@ -569,23 +562,10 @@ if __name__ == "__main__":
         FLIES[sprite_name] = sprite
         print("sprite_name {} and shape {}".format(sprite_name, sprite.shape))
 
-
-
-    #filter_path = './assets/filter3.png'
-    #filter_full = cv2.imread(filter_path, cv2.IMREAD_UNCHANGED) #Read  PNG 
-
-    
-    """    
-    dog_filter = {  'nose' : filter_full[302:390,147:300],
-                    'ear_left' : filter_full[55:195,0:160],
-                    'ear_right' : filter_full[55:190,255:420],
-                }
-    """
-
     
     file_path = 'john_wick.jpg'
-    #image_2d_landmarks(file_path)
-    result = add_filter(file_path,'mustache')
+   
+    result = add_filter(file_path,'rainbow')
 
     plt.axis('off')
     plt.imshow(result)
