@@ -14,8 +14,11 @@ Use snapchat like  filters while maintaning your privacy.
  
  # Filter Examples 
 
-### Doggy ears
+### Face detected with Glasses
 ![*Example*](./media/result.png)
+
+### Doggy ears
+![*Example*](./media/doggy.png)
 
 ###  Elegant hat
 ![*Example*](./media/hat.png)
