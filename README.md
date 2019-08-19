@@ -1,6 +1,6 @@
 # flaffylter
 
-Use snapchat like  filters while maintaning your privacy.
+Use **snapchat** like  filters while maintaning your **privacy**.
 
 - Use facial filters like:
   - glasses
@@ -8,8 +8,8 @@ Use snapchat like  filters while maintaning your privacy.
   - facial makeup
   - faceswap
   - face aging
- - You face images will be encrypted.
- - While in the server image  cannot  reveal your face.
+ - You face images will be **encrypted**.
+ - While in the server image  cannot  **reveal your face**.
  
  
  # Filter Examples 
