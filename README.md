@@ -29,4 +29,7 @@ Both steps uses **pytorch**.
 ### Rainbow 
 ![*Example*](./media/rainbow.png)
 
+#### Draw facial features
+![Facial features](./media/facial_features.png)
+
 
