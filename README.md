@@ -2,6 +2,8 @@
 
 Use **snapchat** like  filters while maintaning your **privacy**.
 
+**Based on** [charlielito](https://github.com/charlielito/snapchat-filters-opencv) work **snapchat filters with opencv**  
+
 - Use facial filters like:
   - glasses
   - hats
