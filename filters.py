@@ -14,11 +14,57 @@ from scipy.spatial import ConvexHull
 from utils.convex_hull import CHull
 
 
+def centroid(ch):
+    """
+    """
+    c = tuple(np.mean(ch, axis=0)[0])
 
 
-def draw_features():
+    return c
+
+def draw_features(image_path):
+    """
+    image_path: string 
+    """
     # TO DO
-    pass
+
+    image = open_image_cv2(image_path)
+
+    faces, preds = get_features_from_image(image)
+
+    # create hull array for convex hull points
+    hulls = []
+
+    for i,coordinates  in enumerate(faces):
+       
+        for key in PRED_TYPES.keys():
+            points = get_points_from_feature(name = key, preds = preds ).astype(np.int)
+            hulls.extend([cv2.convexHull(points, False)])
+
+        # draw contours and hull points
+        for i in range(len(hulls)):
+            color = (255, 255, 255) # blue - color for convex hull
+           
+            # draw ith convex hull object
+            cv2.drawContours(image, hulls, i, color, 1, 8)
+            # Get convex hull
+            hull = hulls[i]
+            # Get centroid 
+            c = centroid(hull)
+            
+            # Draw centroid
+            cv2.circle(image, center = tuple(map(int, c)), radius = 2 , color = (123,70,10), thickness=1, lineType=8, shift=0)
+
+
+            
+
+
+    return image
+
+
+
+
+    
 
 def open_image(image_path):
     
@@ -96,7 +142,7 @@ def adjust_sprite2head(sprite, head_width, head_y_pos, ontop = True):
     (h_sprite, w_sprite) = (sprite.shape[0],sprite.shape[1])
 
     #print("Head width {} width sprite {}".format(head_width, w_sprite))
-    factor = 1.1 *  head_width / w_sprite
+    factor = 1.0 *  head_width / w_sprite
     #print("Factor ", factor)
     
     # Resize sprite. Adjust to have the same width as head
@@ -133,6 +179,7 @@ def apply_sprite(image, sprite,w,x,y, angle, ontop = True):
     return image
 
 
+   
 
 
 
@@ -144,12 +191,9 @@ def compute_inclination(point1, point2):
     Returns angle between points in degrees
     """
 
-    #find vector 
-    vec  = [point2[0] - point1[0]  , point2[1] - point1[1] ]
-
-    angle = vec[0] /  np.sqrt( vec[0]**2  + vec[1] ** 2  )
-
-    return angle 
+    x1,x2,y1,y2 = point1[0], point2[0], point1[1], point2[1]
+    incl = 180/math.pi*math.atan((float(y2-y1))/(x2-x1))
+    return incl
 
 
 def calculate_boundbox(list_coordinates):
@@ -184,14 +228,9 @@ def get_face_boundbox(points,face_part):
     return a list of tuple (x,y,w,h) 
 
     """
-    #print("Points", points )
-
     part_points = get_points_from_feature(name = face_part,preds = points)
 
-   
-
     x,y,w,h = calculate_boundbox( part_points)
-
 
     return x,y,w,h 
 
@@ -206,7 +245,7 @@ def get_best_scaling(target_width, filter_width ):
     """
     # Scale width by 1.1
 
-    return 1.1 * (target_width / filter_width)
+    return 1.0 * (target_width / filter_width)
 
 
 
@@ -245,6 +284,7 @@ def rotate_image(img, angle, scale):
     new_img = cv2.warpAffine(img, rotation_matrix, shape,
                              flags = cv2.INTER_LINEAR,
                              borderMode = cv2.BORDER_TRANSPARENT)
+                             
     return new_img
 
 
@@ -318,7 +358,7 @@ def add_filter(img_path, filter_name):
         
       
 
-        angle =-1* compute_inclination(eyebrow1[0],eyebrow2[0] ) #inclination based on eyebrowns
+        angle = -compute_inclination(eyebrow1[0],eyebrow2[0] ) #inclination based on eyebrowns
         
 
         mouth = get_points_from_feature(name = 'lips', preds = preds)
@@ -367,7 +407,6 @@ def add_filter(img_path, filter_name):
 
         # CV2 Assumes (x,y) : (row , column)
         #cv2.rectangle(img,(x0,y0),(x0 + w0,y0  + h0),(255,0,0),1)
-
         if filter_name == "doggy":
 
             x3 , y3, w3, h3 = get_face_boundbox(preds, 'nostril')
@@ -385,7 +424,7 @@ def add_filter(img_path, filter_name):
         if filter_name == 'rainbow':
             
             if True:
-                apply_sprite(img, SPRITES['rainbow'], w0,x0,y0,angle, ontop = False)
+                apply_sprite(img, SPRITES['rainbow'], w0,x0,y0,angle =  0 , ontop = False)
 
 
 
@@ -533,7 +572,6 @@ if __name__ == "__main__":
     filters = ['images/sunglasses.png', 'images/sunglasses_2.png', 'images/sunglasses_3.jpg', 'images/sunglasses_4.png', 'images/sunglasses_5.jpg', 'images/sunglasses_6.png','images/pixel.png']
     filterIndex = 6
 
-    SPRITES = [0,0,0,0,0] #hat, mustache, flies, glasses, doggy -> 1 is visible, 0 is not visible
     
     # Preload sprites 
     sprites_dir = "sprites"
@@ -565,9 +603,17 @@ if __name__ == "__main__":
     
     file_path = 'john_wick.jpg'
    
-    result = add_filter(file_path,'rainbow')
+    #result = add_filter(file_path,'glasses')
 
-    plt.axis('off')
-    plt.imshow(result)
-    plt.show()
+    result = draw_features(file_path)
+
+    #plt.axis('off')
+    #plt.imshow(result)
+    #plt.show()
+
+    cv2.imshow('image',result)
+    cv2.imwrite('media/facial_features.png', result )
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
     
+
