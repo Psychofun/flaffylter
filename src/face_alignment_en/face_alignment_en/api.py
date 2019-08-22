@@ -66,9 +66,9 @@ class FaceAlignment:
             torch.backends.cudnn.benchmark = True
 
         # Get the face detector
-        face_detector_module = __import__('face_alignment.detection.' + face_detector,
+        face_detector_module = __import__('face_alignment_en.detection.' + face_detector,
                                           globals(), locals(), [face_detector], 0)
-        self.face_detector = face_detector_module.FaceDetector(device=device, verbose=verbose)
+        self.face_detector = face_detector_module.FaceDetector(device=device, verbose=verbose, workers = workers)
 
         # Encrypt face detector 
         self.face_detector.face_detector  = self.face_detector.face_detector.fix_precision().share(*self.workers)
