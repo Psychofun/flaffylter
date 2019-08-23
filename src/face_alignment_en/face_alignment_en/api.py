@@ -30,9 +30,9 @@ class LandmarksType(Enum):
 
 
 class NetworkSize(Enum):
-    # TINY = 1
-    # SMALL = 2
-    # MEDIUM = 3
+    #TINY = 1
+    #SMALL = 2
+    #MEDIUM = 3
     LARGE = 4
 
     def __new__(cls, value):
@@ -51,7 +51,7 @@ models_urls = {
 
 
 class FaceAlignment:
-    def __init__(self, landmarks_type, network_size=NetworkSize.LARGE,
+    def __init__(self, landmarks_type, network_size=NetworkSize.LARGE, 
                  device='cuda', flip_input=False, face_detector='sfd', verbose=False, workers = []):
         self.device = device
         self.flip_input = flip_input
@@ -70,19 +70,24 @@ class FaceAlignment:
                                           globals(), locals(), [face_detector], 0)
         self.face_detector = face_detector_module.FaceDetector(device=device, verbose=verbose, workers = workers)
 
+        
         # Encrypt face detector 
         self.face_detector.face_detector  = self.face_detector.face_detector.fix_precision().share(*self.workers)
-
+        
+        
         
 
         # Initialise the face alignemnt networks
         self.face_alignment_net = FAN(network_size)
+
+
         if landmarks_type == LandmarksType._2D:
             network_name = '2DFAN-' + str(network_size)
         else:
             network_name = '3DFAN-' + str(network_size)
 
         fan_weights = load_url(models_urls[network_name], map_location=lambda storage, loc: storage)
+        
         self.face_alignment_net.load_state_dict(fan_weights)
 
         self.face_alignment_net.to(device)
